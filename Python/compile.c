@@ -790,7 +790,56 @@ compiler_codegen(compiler *c, mod_ty mod)
     switch (mod->kind) {
     case Module_kind: {
         asdl_stmt_seq *stmts = mod->v.Module.body;
+
+        for (Py_ssize_t i = 0, i < asdl_seq_LEN(stmts), i++) {
+            stmt_ty st = (stmt_ty)asdl_seq_GET(stmts, i);
+            if (st->kind == PACKAGE_STMT) {
+                identifier *modules = st->v.PackageStmt.Modules;
+                Py_ssize_t n_modules = asdl_seq_LEN(modules);
+                PyObject *module_list = PyList_New(modules);
+                if (!module_list) {
+                    PyErr_SetString(PyExc_MemoryError, "Failed to create module list");
+                    return ERROR;
+                }
+
+                for (Py_ssize_t j = 0; j < n_modules; j++) {
+                    PyObject *module_id = PyUnicode_FromString(asdl_seq_GET(modules, j));
+                    if (!module_id) {
+                        Py_DECREF(module_list);
+                        return ERROR;
+                    }
+                    PyList_SET_ITEM(module_list, j, module_id);  
+                }
+            PyObject *dot = PyUnicode_FromString(".");
+            PyObject *package_name = PyUnicode_Join(dot, module_list);
+            Py_DECREF(dot);
+            Py_DECREF(module_list);
+
+            if (!package_name) {
+                PyErr_SetString(PyExc_SyntaxError, "Invalid package name");
+                return ERROR;
+            }
+
+            PyObject *pkg_module = PyImport_Import(package_name);
+            Py_DECREF(package_name);
+
+            if (!pkg_module) {
+                PyErr_SetString(PyExc_RuntimeError, "Failed to import package");
+                return ERROR;
+            }
+
+            if (PyDict_SetItemString(c->u->f->f_globals, "__package__", pkg_module) < 0) {
+                Py_DECREF(package_name);
+                PyErr_SetString(PyExc_RuntimeError, "Failed to set __package__");
+                return ERROR;
+            }
+
+            Py_DECREF(package_name);
+
+            continue;
+        }
         RETURN_IF_ERROR(_PyCodegen_Body(c, start_location(stmts), stmts, false));
+    }
         break;
     }
     case Interactive_kind: {
