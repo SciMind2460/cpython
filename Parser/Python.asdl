@@ -47,7 +47,7 @@ module Python
 
           | Import(alias* names)
           | ImportFrom(identifier? module, alias* names, int? level)
-          | Package(identifier* module)
+          | Module(alias* names)
 
           | Global(identifier* names)
           | Nonlocal(identifier* names)
