@@ -237,9 +237,9 @@ dotted_name[expr_ty]:
 # Common elements
 # ---------------
 
-package_stmt: "package" package_name
+module: "module" module_name
 
-package_name: NAME ("." NAME)
+module_name: NAME ("." NAME)
 
 block[asdl_stmt_seq*] (memo):
     | NEWLINE INDENT a=statements DEDENT { a }
